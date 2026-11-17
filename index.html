@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es" data-tema="oscuro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Escuela Sabática Accesible</title>
+  <meta name="description" content="Escucha, descarga y lee las 13 lecciones de la Escuela Sabática con total accesibilidad.">
+  <meta name="theme-color" content="#000000">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Escuela Sabática">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <a class="saltar" href="#leccion-titulo">Saltar al contenido de la lección</a>
+
+  <header>
+    <h1>Escuela Sabática Accesible</h1>
+
+    <div class="barra-herramientas" role="group" aria-label="Opciones de lectura">
+      <button type="button" id="btn-fuente-menos" aria-label="Disminuir tamaño de letra">A-</button>
+      <button type="button" id="btn-fuente-mas" aria-label="Aumentar tamaño de letra">A+</button>
+      <button type="button" id="btn-tema">Modo claro</button>
+    </div>
+  </header>
+
+  <nav aria-label="Navegación entre lecciones">
+    <label for="selector-leccion">Seleccionar lección</label>
+    <select id="selector-leccion"></select>
+
+    <div class="botones-nav">
+      <button type="button" id="btn-anterior">Lección anterior</button>
+      <button type="button" id="btn-siguiente">Lección siguiente</button>
+    </div>
+  </nav>
+
+  <main id="contenido">
+    <article aria-labelledby="leccion-titulo">
+      <h2 id="leccion-titulo" tabindex="-1"></h2>
+
+      <section aria-labelledby="audio-titulo">
+        <h3 id="audio-titulo">Audio de la lección</h3>
+        <audio id="reproductor" controls preload="metadata"></audio>
+        <a id="enlace-descarga" class="boton-enlace" href="#" download></a>
+      </section>
+
+      <section aria-labelledby="versiculo-titulo">
+        <h3 id="versiculo-titulo">Versículo para memorizar</h3>
+        <blockquote>
+          <p id="versiculo-texto"></p>
+          <p><cite id="versiculo-referencia"></cite></p>
+        </blockquote>
+      </section>
+
+      <div id="secciones-lectura"></div>
+    </article>
+  </main>
+
+  <!-- Región viva para anuncios del lector de pantalla -->
+  <div id="anuncios" class="solo-lector" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="lecciones.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    var LECCIONES = window.LECCIONES;
+    var CLAVE = { leccion: 'esa-leccion', fuente: 'esa-fuente', tema: 'esa-tema' };
+    var FUENTE_MIN = 100, FUENTE_MAX = 220, FUENTE_PASO = 20;
+
+    var $ = function (id) { return document.getElementById(id); };
+    var selector = $('selector-leccion');
+    var btnAnterior = $('btn-anterior');
+    var btnSiguiente = $('btn-siguiente');
+    var titulo = $('leccion-titulo');
+    var reproductor = $('reproductor');
+    var descarga = $('enlace-descarga');
+    var versTexto = $('versiculo-texto');
+    var versRef = $('versiculo-referencia');
+    var secciones = $('secciones-lectura');
+    var anuncios = $('anuncios');
+    var btnTema = $('btn-tema');
+    var btnMas = $('btn-fuente-mas');
+    var btnMenos = $('btn-fuente-menos');
+
+    var indiceActual = 0;
+    var fuente = 100;
+
+    /* ---------- Almacenamiento seguro ---------- */
+    function leer(clave) { try { return localStorage.getItem(clave); } catch (e) { return null; } }
+    function guardar(clave, valor) { try { localStorage.setItem(clave, valor); } catch (e) {} }
+
+    /* ---------- Anuncios para lectores de pantalla ---------- */
+    function anunciar(texto) {
+      anuncios.textContent = '';
+      setTimeout(function () { anuncios.textContent = texto; }, 60);
+    }
+
+    /* ---------- Selector ---------- */
+    LECCIONES.forEach(function (l, i) {
+      var op = document.createElement('option');
+      op.value = String(i);
+      op.textContent = 'Lección ' + l.numero + ': ' + l.titulo;
+      selector.appendChild(op);
+    });
+
+    /* ---------- Mostrar lección ---------- */
+    function mostrarLeccion(i, opciones) {
+      opciones = opciones || {};
+      if (i < 0 || i >= LECCIONES.length) { return; }
+      var l = LECCIONES[i];
+      indiceActual = i;
+
+      titulo.textContent = 'Lección ' + l.numero + ': ' + l.titulo;
+      versTexto.textContent = l.versiculo;
+      versRef.textContent = l.referencia;
+
+      // Audio
+      reproductor.pause();
+      reproductor.setAttribute('aria-label', 'Reproductor de audio de la Lección ' + l.numero + ': ' + l.titulo);
+      reproductor.src = l.audio;
+      reproductor.load();
+
+      descarga.href = l.audio;
+      descarga.setAttribute('download', l.audio.split('/').pop());
+      descarga.setAttribute('aria-label', 'Descargar audio MP3 de la Lección ' + l.numero + ': ' + l.titulo);
+      descarga.textContent = 'Descargar audio MP3';
+
+      // Texto de la lección
+      secciones.textContent = '';
+      l.secciones.forEach(function (s) {
+        var sec = document.createElement('section');
+        var h3 = document.createElement('h3');
+        h3.textContent = s.titulo;
+        sec.appendChild(h3);
+        s.parrafos.forEach(function (t) {
+          var p = document.createElement('p');
+          p.textContent = t;
+          sec.appendChild(p);
+        });
+        secciones.appendChild(sec);
+      });
+
+      // Controles de navegación
+      selector.value = String(i);
+      btnAnterior.disabled = (i === 0);
+      btnSiguiente.disabled = (i === LECCIONES.length - 1);
+
+      // Persistencia y URL
+      guardar(CLAVE.leccion, String(i));
+      try { history.replaceState(null, '', '#leccion-' + l.numero); } catch (e) {}
+      document.title = 'Lección ' + l.numero + ': ' + l.titulo + ' · Escuela Sabática Accesible';
+
+      if (opciones.enfocar) {
+        anunciar('Lección ' + l.numero + ' cargada: ' + l.titulo);
+        titulo.focus();
+        window.scrollTo(0, 0);
+      }
+    }
+
+    selector.addEventListener('change', function () {
+      mostrarLeccion(parseInt(selector.value, 10), { enfocar: true });
+    });
+    btnAnterior.addEventListener('click', function () {
+      mostrarLeccion(indiceActual - 1, { enfocar: true });
+    });
+    btnSiguiente.addEventListener('click', function () {
+      mostrarLeccion(indiceActual + 1, { enfocar: true });
+    });
+
+    // Error de audio (por ejemplo, MP3 aún no subido)
+    reproductor.addEventListener('error', function () {
+      anunciar('El audio de esta lección no está disponible en este momento.');
+    });
+
+    /* ---------- Tamaño de fuente ---------- */
+    function aplicarFuente(anunciarCambio) {
+      document.documentElement.style.fontSize = fuente + '%';
+      guardar(CLAVE.fuente, String(fuente));
+      btnMenos.disabled = fuente <= FUENTE_MIN;
+      btnMas.disabled = fuente >= FUENTE_MAX;
+      if (anunciarCambio) { anunciar('Tamaño de letra: ' + fuente + ' por ciento'); }
+    }
+    btnMas.addEventListener('click', function () {
+      fuente = Math.min(FUENTE_MAX, fuente + FUENTE_PASO);
+      aplicarFuente(true);
+    });
+    btnMenos.addEventListener('click', function () {
+      fuente = Math.max(FUENTE_MIN, fuente - FUENTE_PASO);
+      aplicarFuente(true);
+    });
+
+    /* ---------- Tema alto contraste ---------- */
+    function aplicarTema(tema, anunciarCambio) {
+      document.documentElement.setAttribute('data-tema', tema);
+      var color = tema === 'oscuro' ? '#000000' : '#FFFFFF';
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', color);
+      btnTema.textContent = tema === 'oscuro' ? 'Modo claro' : 'Modo oscuro';
+      btnTema.setAttribute('aria-label',
+        tema === 'oscuro' ? 'Cambiar a modo claro de alto contraste' : 'Cambiar a modo oscuro de alto contraste');
+      guardar(CLAVE.tema, tema);
+      if (anunciarCambio) {
+        anunciar(tema === 'oscuro' ? 'Modo oscuro de alto contraste activado' : 'Modo claro de alto contraste activado');
+      }
+    }
+    btnTema.addEventListener('click', function () {
+      var actual = document.documentElement.getAttribute('data-tema');
+      aplicarTema(actual === 'oscuro' ? 'claro' : 'oscuro', true);
+    });
+
+    /* ---------- Inicio ---------- */
+    var f = parseInt(leer(CLAVE.fuente), 10);
+    if (f >= FUENTE_MIN && f <= FUENTE_MAX) { fuente = f; }
+    aplicarFuente(false);
+    aplicarTema(leer(CLAVE.tema) === 'claro' ? 'claro' : 'oscuro', false);
+
+    var inicial = 0;
+    var m = /^#leccion-(\d+)$/.exec(location.hash);
+    if (m) {
+      inicial = LECCIONES.findIndex(function (l) { return l.numero === parseInt(m[1], 10); });
+      if (inicial < 0) { inicial = 0; }
+    } else {
+      var g = parseInt(leer(CLAVE.leccion), 10);
+      if (g >= 0 && g < LECCIONES.length) { inicial = g; }
+    }
+    mostrarLeccion(inicial, { enfocar: false });
+
+    /* ---------- Service Worker ---------- */
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
+  })();
+  </script>
+</body>
+</html>
